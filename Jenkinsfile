@@ -23,3 +23,6 @@ pipeline {
                     sh 'docker build -t my-app:${BUILD_VERSION} .'
                     // Tag the image for GCR
                     sh "docker tag my-app:${BUILD_VERSION} ${GCR_REPO}:${BUILD_VERSION}"
+                }
+            }
+        }
