@@ -1,0 +1,5 @@
+telethon
+flask
+python-dotenv
+cryptg
+pytz
