@@ -1,35 +1,21 @@
-# --- STAGE 1: Builder ---
-FROM python:3.11-slim AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    python3-dev \
-    libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# --- STAGE 2: Final Runtime ---
-FROM python:3.11-slim
-
+# Stage 1: Build & Test Environment
+FROM python:3.12-slim AS builder
 WORKDIR /app
-
-ENV PYTHONUNBUFFERED=1
-ENV TZ=Asia/Kolkata
-ENV PATH="/opt/venv/bin:$PATH"
-
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata && \
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /opt/venv /opt/venv
+COPY requirements.txt .
+# Install dependencies into a separate folder
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 COPY . .
 
-EXPOSE 5000
-CMD ["python", "app.py"]
+# Stage 2: Final Lean Runtime
+FROM python:3.12-slim
+WORKDIR /app
+# Copy only the installed packages and your app code
+COPY --from=builder /install /usr/local
+COPY --from=builder /app /app
+
+# Security: Run as a non-root user (Standard for GKE)
+RUN useradd -m appuser
+USER appuser
+
+# Start your app
+CMD ["python", "main.py"]
