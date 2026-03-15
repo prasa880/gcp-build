@@ -1,4 +1,3 @@
-
 pipeline {
     agent {
         kubernetes {
@@ -16,29 +15,32 @@ spec:
     image: gcr.io/kaniko-project/executor:debug
     command: ["sleep"]
     args: ["9999999"]
-    resources:
-      requests:
-        cpu: "500m"
-        memory: "1Gi"
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["cat"]
+    tty: true
 '''
         }
     }
 
     environment {
-        // Updated to your specific registry path
+        // Change this if your repository path changes
         IMAGE_PATH = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
     }
 
     stages {
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                // Pulls your code from GitHub
+                checkout scm
+            }
         }
 
         stage('Unit Tests') {
             steps {
                 container('python-test') {
                     sh '''
-                    pip install pytest
+                    pip install pytest flask
                     pytest tests/
                     '''
                 }
@@ -48,7 +50,7 @@ spec:
         stage('Build & Push') {
             steps {
                 container('kaniko') {
-                    // --cache=true helps speed up future builds
+                    // Builds using the Dockerfile and pushes to Google Artifact Registry
                     sh """
                     /kaniko/executor \
                     --context ${env.WORKSPACE} \
@@ -59,6 +61,32 @@ spec:
                     """
                 }
             }
+        }
+
+        stage('Deploy to GKE') {
+            steps {
+                container('kubectl') {
+                    sh """
+                    # Update the YAML with the new image tag we just built
+                    sed -i "s|IMAGE_TAG|${env.BUILD_NUMBER}|g" deployment.yaml
+                    
+                    # Apply the deployment to your GKE cluster
+                    kubectl apply -f deployment.yaml
+                    
+                    # Wait for the pods to be ready
+                    kubectl rollout status deployment/my-python-app
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Successfully built and deployed version ${env.BUILD_NUMBER}"
+        }
+        failure {
+            echo "Pipeline failed. Check logs for Unit Test or Kaniko errors."
         }
     }
 }

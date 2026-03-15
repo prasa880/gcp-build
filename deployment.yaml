@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-python-app
+  labels:
+    app: my-python-app
+spec:
+  replicas: 2 # GKE Autopilot will run 2 copies for high availability
+  selector:
+    matchLabels:
+      app: my-python-app
+  template:
+    metadata:
+      labels:
+        app: my-python-app
+    spec:
+      containers:
+      - name: my-python-app
+        # This placeholder 'IMAGE_TAG' will be replaced by Jenkins
+        image: us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build:IMAGE_TAG
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-python-app-service
+spec:
+  type: LoadBalancer # This creates a public IP address
+  selector:
+    app: my-python-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
