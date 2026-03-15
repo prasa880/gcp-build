@@ -41,18 +41,13 @@ spec:
 
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Unit Tests') {
             steps {
                 container('python-test') {
-                    sh '''
-                    pip install pytest flask
-                    pytest tests/
-                    '''
+                    sh 'pip install pytest flask && pytest tests/'
                 }
             }
         }
@@ -60,14 +55,7 @@ spec:
         stage('Build & Push') {
             steps {
                 container('kaniko') {
-                    sh """
-                    /kaniko/executor \
-                    --context ${env.WORKSPACE} \
-                    --dockerfile Dockerfile \
-                    --destination ${env.IMAGE_PATH}:${env.BUILD_NUMBER} \
-                    --destination ${env.IMAGE_PATH}:latest \
-                    --cache=true
-                    """
+                    sh "/kaniko/executor --context ${env.WORKSPACE} --dockerfile Dockerfile --destination ${env.IMAGE_PATH}:${env.BUILD_NUMBER} --destination ${env.IMAGE_PATH}:latest --cache=true"
                 }
             }
         }
@@ -76,26 +64,12 @@ spec:
             steps {
                 container('kubectl') {
                     sh """
-                    # 1. Update the deployment file with the new build number
                     sed -i "s|IMAGE_TAG|${env.BUILD_NUMBER}|g" deployment.yaml
-                    
-                    # 2. Apply the manifest to GKE
                     kubectl apply -f deployment.yaml
-                    
-                    # 3. Monitor the rollout to ensure it succeeds
                     kubectl rollout status deployment/my-python-app
                     """
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "CI/CD Complete: Version ${env.BUILD_NUMBER} is now live."
-        }
-        failure {
-            echo "Pipeline failed. Check the logs of the specific container that crashed."
         }
     }
 }
