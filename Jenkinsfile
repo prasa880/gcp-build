@@ -11,27 +11,37 @@ spec:
     image: python:3.12-slim
     command: ["cat"]
     tty: true
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
     command: ["sleep"]
     args: ["9999999"]
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
   - name: kubectl
     image: bitnami/kubectl:latest
     command: ["cat"]
     tty: true
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
 '''
         }
     }
 
     environment {
-        // Change this if your repository path changes
         IMAGE_PATH = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Pulls your code from GitHub
                 checkout scm
             }
         }
@@ -50,7 +60,6 @@ spec:
         stage('Build & Push') {
             steps {
                 container('kaniko') {
-                    // Builds using the Dockerfile and pushes to Google Artifact Registry
                     sh """
                     /kaniko/executor \
                     --context ${env.WORKSPACE} \
@@ -67,13 +76,13 @@ spec:
             steps {
                 container('kubectl') {
                     sh """
-                    # Update the YAML with the new image tag we just built
+                    # 1. Update the deployment file with the new build number
                     sed -i "s|IMAGE_TAG|${env.BUILD_NUMBER}|g" deployment.yaml
                     
-                    # Apply the deployment to your GKE cluster
+                    # 2. Apply the manifest to GKE
                     kubectl apply -f deployment.yaml
                     
-                    # Wait for the pods to be ready
+                    # 3. Monitor the rollout to ensure it succeeds
                     kubectl rollout status deployment/my-python-app
                     """
                 }
@@ -83,10 +92,10 @@ spec:
 
     post {
         success {
-            echo "Successfully built and deployed version ${env.BUILD_NUMBER}"
+            echo "CI/CD Complete: Version ${env.BUILD_NUMBER} is now live."
         }
         failure {
-            echo "Pipeline failed. Check logs for Unit Test or Kaniko errors."
+            echo "Pipeline failed. Check the logs of the specific container that crashed."
         }
     }
 }
