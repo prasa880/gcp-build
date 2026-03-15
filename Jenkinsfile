@@ -1,3 +1,4 @@
+
 pipeline {
     agent {
         kubernetes {
@@ -7,14 +8,12 @@ kind: Pod
 spec:
   containers:
   - name: kaniko
-    image: gcr.io/kaniko-project/executor:debug  # 'debug' contains a shell (sh), 'latest' does not
-    command:
-    - sleep
-    args:
-    - "999999"
+    image: gcr.io/kaniko-project/executor:debug
+    command: ["sleep"]
+    args: ["9999999"]
     volumeMounts:
     - name: gcp-key
-      mountPath: /kaniko/.docker/ 
+      mountPath: /kaniko/.docker/
   volumes:
   - name: gcp-key
     secret:
@@ -27,24 +26,39 @@ spec:
     }
 
     environment {
-        // Correcting the format to ensure it's a valid Artifact Registry path
-        GCR_REPO = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
+        // The path to your Google Artifact Registry
+        REGISTRY_URL = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
     }
 
     stages {
-        stage('Build & Push Image') {
+        stage('Checkout Source') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Push to GCR') {
             steps {
                 container('kaniko') {
-                    // Using env variables directly in the shell
                     sh """
                     /kaniko/executor \
                     --context ${env.WORKSPACE} \
                     --dockerfile Dockerfile \
-                    --destination ${GCR_REPO}:${env.BUILD_NUMBER} \
+                    --destination ${REGISTRY_URL}:${env.BUILD_NUMBER} \
+                    --destination ${REGISTRY_URL}:latest \
                     --cache=true
                     """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Successfully pushed image version: ${env.BUILD_NUMBER}"
+        }
+        failure {
+            echo "Build failed. Check the Kaniko container logs."
         }
     }
 }
