@@ -5,7 +5,6 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
-  # This is the "Magic" line that links everything
   serviceAccountName: jenkins-kaniko-sa
   containers:
   - name: kaniko
@@ -24,25 +23,35 @@ spec:
     }
 
     environment {
+        // Double check this path matches your GCP Console
         REGISTRY_URL = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
     }
 
     stages {
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
-        stage('Build & Push') {
+        stage('Build & Push to GCR') {
             steps {
                 container('kaniko') {
                     sh """
                     /kaniko/executor \
                     --context ${env.WORKSPACE} \
                     --dockerfile Dockerfile \
-                    --destination ${REGISTRY_URL}:${env.BUILD_NUMBER}
+                    --destination ${REGISTRY_URL}:${env.BUILD_NUMBER} \
+                    --destination ${REGISTRY_URL}:latest
                     """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Success! Image is now in Artifact Registry."
         }
     }
 }
