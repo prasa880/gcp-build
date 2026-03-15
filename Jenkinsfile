@@ -1,7 +1,7 @@
 pipeline {
-    agent {
-        kubernetes {
-            yaml '''
+  agent {
+  kubernetes {
+    yaml '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -9,11 +9,16 @@ spec:
   - name: kaniko
     image: gcr.io/kaniko-project/executor:latest
     command:
-    - cat
-    tty: true
+    - sleep
+    args:
+    - "999999"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
 '''
-        }
-    }
+  }
+}
 
     environment {
         GCR_REPO = 'us-central1-docker.pkg.dev/project-f749c631-40a8-4185-8cb/prasanth/new-build'
